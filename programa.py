@@ -28,17 +28,15 @@ class Game:
 
         identifier = parts[0].decode('utf-8')
         title = parts[1].decode('utf-8')
-        
         try:
             year = int(parts[2].decode('utf-8'))
         except ValueError:
-            print(f"Erro ao converter ano: {parts[2].decode('utf-8')}")
-            raise ValueError(f"Ano inválido: {parts[2].decode('utf-8')}")
+            year = 0  # Define um valor padrão para o ano inválido
 
         genre = parts[3].decode('utf-8')
         producer = parts[4].decode('utf-8')
         platform = parts[5].decode('utf-8')
-        
+
         return cls(identifier, title, year, genre, producer, platform)
 
 def read_game(file, offset):
@@ -52,13 +50,8 @@ def read_game(file, offset):
     return Game.from_bytes(record_data)
 
 def buscar_jogo_por_id(file, identificador):
-    # Definindo o tamanho máximo esperado para um registro (ajuste conforme necessário)
-    tamanho_maximo_registro = 256
-
-    # Calculando o offset baseado no identificador
+    tamanho_maximo_registro = 264
     offset = (identificador - 1) * tamanho_maximo_registro
-
-    # Lendo o registro
     registro_data = ler_registro(file, offset)
 
     if registro_data:
@@ -68,72 +61,72 @@ def buscar_jogo_por_id(file, identificador):
         return None
 
 def ler_registro(file, offset):
-    # Definindo a estrutura do registro
-    registro_formato = "<4si64s64s64s64s"
-
-    # Movendo o cursor para o offset especificado
-    file.seek(offset)
-
     try:
-        # Lendo os dados do registro
-        registro = struct.unpack(registro_formato, file.read(struct.calcsize(registro_formato)))
-        
-        # Decodificando os campos para strings corretas
-        identifier = registro[0].decode('utf-8').strip('\x00')
-        year = registro[1]
-        title = registro[2].decode('utf-8').strip('\x00')
-        genre = registro[3].decode('utf-8').strip('\x00')
-        producer = registro[4].decode('utf-8').strip('\x00')
-        platform = registro[5].decode('utf-8').strip('\x00')
+        # Tamanho do cabeçalho em bytes
+        tamanho_cabecalho = 4
+        # Tamanho dos registros de jogo em bytes
+        tamanho_registro = 264
 
-        return (identifier, year, title, genre, producer, platform)
-    except struct.error:
+        # Calcula a posição absoluta no arquivo, considerando o cabeçalho
+        posicao_absoluta = tamanho_cabecalho + offset
+        file.seek(posicao_absoluta)
+
+        # Lê exatamente o tamanho do registro
+        registro = file.read(tamanho_registro)
+
+        if len(registro) != tamanho_registro:
+            return None
+        
+        # Decodifica os campos do registro
+        identifier_bytes = registro[0:4]
+        title_bytes = registro[4:68].split(b'\x00', 1)[0]
+        year_bytes = registro[68:72].split(b'\x00', 1)[0]
+        genre_bytes = registro[72:136].split(b'\x00', 1)[0]
+        producer_bytes = registro[136:200].split(b'\x00', 1)[0]
+        platform_bytes = registro[200:264].split(b'\x00', 1)[0]
+
+        identifier = struct.unpack('<I', identifier_bytes)[0]
+        title = title_bytes.decode('utf-8')
+        year_str = year_bytes.decode('utf-8')
+        try:
+            year = int(year_str)
+        except ValueError:
+            year = 0
+
+        genre = genre_bytes.decode('utf-8')
+        producer = producer_bytes.decode('utf-8')
+        platform = platform_bytes.decode('utf-8')
+
+        return (identifier, title, year, genre, producer, platform)
+
+    except Exception as e:
+        print(f"Erro ao ler registro: {e}")
         return None
 
+
 def search_game(file, identifier):
     try:
-        with open('dados.dat', 'rb') as file:
-            # Definindo o tamanho do registro (está definido como 264 bytes no seu exemplo)
-            tamanho_registro = 264
-            offset = (identifier - 1) * tamanho_registro  # Calculando o offset baseado no identificador
+        tamanho_registro = 264
+        offset = (identifier - 1) * tamanho_registro
 
-            # Lendo o registro
-            registro = ler_registro(file, offset)
+        registro = ler_registro(file, offset)
 
-            if registro:
-                print(f"{identifier}|{registro[2]}|{registro[1]}|{registro[3]}|{registro[4]}|{registro[5]}| ({tamanho_registro} bytes)")
-            else:
-                print(f"Jogo com identificador {identifier} não encontrado.")
+        if registro:
+            # Imprime apenas os primeiros 6 campos
+            print(f"{identifier}|{registro[1]}|{registro[2]}|{registro[3]}|{registro[4]}|{registro[5]}")
+        else:
+            print(f"Jogo com identificador {identifier} não encontrado.")
     except ValueError as ve:
         print(f"Erro ao processar registro: {ve}")
-def search_game(file, identifier):
-    try:
-        with open('dados.dat', 'rb') as file:
-            # Definindo o tamanho do registro (está definido como 264 bytes no seu exemplo)
-            tamanho_registro = 264
-            offset = (identifier - 1) * tamanho_registro  # Calculando o offset baseado no identificador
 
-            # Lendo o registro
-            registro = ler_registro(file, offset)
-
-            if registro:
-                print(f"{identifier}|{registro[2]}|{registro[1]}|{registro[3]}|{registro[4]}|{registro[5]}| ({tamanho_registro} bytes)")
-            else:
-                print(f"Jogo com identificador {identifier} não encontrado.")
-    except ValueError as ve:
-        print(f"Erro ao processar registro: {ve}")
-        
 
 def insert_game(file, game):
-    # Implementar inserção de novo jogo
     pass
 
 def remove_game(file, identifier):
-    # Implementar remoção de jogo
     pass
 
 def print_led(file):
-    # Implementar impressão da LED
     pass
 
 def process_operations(file, operations):
