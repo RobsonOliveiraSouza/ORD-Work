@@ -39,86 +39,44 @@ class Game:
 
         return cls(identifier, title, year, genre, producer, platform)
 
-def read_game(file, offset):
-    file.seek(offset)
-    tamanho_registro_bytes = file.read(2)
-    if not tamanho_registro_bytes:
+def leia_reg(file):
+    try:
+        tam_bytes = file.read(2)
+        if not tam_bytes:
+            return None
+        tam = int.from_bytes(tam_bytes, byteorder='little')
+        if tam > 0:
+            s = file.read(tam)
+            return s
         return None
-    
-    tamanho_registro = struct.unpack('<H', tamanho_registro_bytes)[0]
-    record_data = file.read(tamanho_registro)
-    return Game.from_bytes(record_data)
+    except Exception as e:
+        print(f'Erro leia_reg: {e}')
+        return None
 
 def buscar_jogo_por_id(file, identificador):
-    tamanho_maximo_registro = 264
-    offset = (identificador - 1) * tamanho_maximo_registro
-    registro_data = ler_registro(file, offset)
-
-    if registro_data:
-        game = Game.from_bytes(registro_data)
-        return game
-    else:
-        return None
-
-def ler_registro(file, offset):
-    try:
-        # Tamanho do cabeçalho em bytes
-        tamanho_cabecalho = 4
-        # Tamanho dos registros de jogo em bytes
-        tamanho_registro = 264
-
-        # Calcula a posição absoluta no arquivo, considerando o cabeçalho
-        posicao_absoluta = tamanho_cabecalho + offset
-        file.seek(posicao_absoluta)
-
-        # Lê exatamente o tamanho do registro
-        registro = file.read(tamanho_registro)
-
-        if len(registro) != tamanho_registro:
+    # Lê os 4 bytes do cabeçalho
+    file.seek(4)
+    while True:
+        registro_data = leia_reg(file)
+        if not registro_data:
             return None
-        
-        # Decodifica os campos do registro
-        identifier_bytes = registro[0:4]
-        title_bytes = registro[4:68].split(b'\x00', 1)[0]
-        year_bytes = registro[68:72].split(b'\x00', 1)[0]
-        genre_bytes = registro[72:136].split(b'\x00', 1)[0]
-        producer_bytes = registro[136:200].split(b'\x00', 1)[0]
-        platform_bytes = registro[200:264].split(b'\x00', 1)[0]
-
-        identifier = struct.unpack('<I', identifier_bytes)[0]
-        title = title_bytes.decode('utf-8')
-        year_str = year_bytes.decode('utf-8')
         try:
-            year = int(year_str)
-        except ValueError:
-            year = 0
-
-        genre = genre_bytes.decode('utf-8')
-        producer = producer_bytes.decode('utf-8')
-        platform = platform_bytes.decode('utf-8')
-
-        return (identifier, title, year, genre, producer, platform)
-
-    except Exception as e:
-        print(f"Erro ao ler registro: {e}")
-        return None
-
+            game = Game.from_bytes(registro_data)
+            if game.identifier == str(identificador):
+                return game
+        except Exception as e:
+            print(f'Erro ao processar registro: {e}')
+            continue
 
 def search_game(file, identifier):
     try:
-        tamanho_registro = 264
-        offset = (identifier - 1) * tamanho_registro
-
-        registro = ler_registro(file, offset)
-
-        if registro:
-            # Imprime apenas os primeiros 6 campos
-            print(f"{identifier}|{registro[1]}|{registro[2]}|{registro[3]}|{registro[4]}|{registro[5]}")
+        game = buscar_jogo_por_id(file, identifier)
+        if game:
+            print(f"{game.identifier}|{game.title}|{game.year}|{game.genre}|{game.producer}|{game.platform}")
         else:
             print(f"Jogo com identificador {identifier} não encontrado.")
     except ValueError as ve:
         print(f"Erro ao processar registro: {ve}")
-
 
 def insert_game(file, game):
     pass
