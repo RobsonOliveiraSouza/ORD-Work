@@ -1,4 +1,3 @@
-import struct
 import sys
 
 class Game:
@@ -10,69 +9,63 @@ class Game:
         self.producer = producer
         self.platform = platform
 
-    def to_bytes(self):
-        identifier_bytes = self.identifier.encode('utf-8')
-        title_bytes = self.title.encode('utf-8')
-        year_bytes = str(self.year).encode('utf-8')
-        genre_bytes = self.genre.encode('utf-8')
-        producer_bytes = self.producer.encode('utf-8')
-        platform_bytes = self.platform.encode('utf-8')
-        
-        return identifier_bytes + b'|' + title_bytes + b'|' + year_bytes + b'|' + genre_bytes + b'|' + producer_bytes + b'|' + platform_bytes + b'|'
+    def to_string(self, tamanho_registro: int) -> str:
+        return f'|{self.identifier}|{self.title}|{self.year}|{self.genre}|{self.producer}|{self.platform}| ({tamanho_registro} bytes)'
 
+    
     @classmethod
-    def from_bytes(cls, data):
+    def from_bytes(self, data):
         parts = data.split(b'|')
         if len(parts) < 6:
             raise ValueError("Dados incompletos para um jogo")
 
-        identifier = parts[0].decode('utf-8')
-        title = parts[1].decode('utf-8')
+        identifier = parts[0].decode('ascii')
+        title = parts[1].decode('ascii')
         try:
-            year = int(parts[2].decode('utf-8'))
+            year = int(parts[2].decode('ascii'))
         except ValueError:
             year = 0  # Define um valor padrão para o ano inválido
 
-        genre = parts[3].decode('utf-8')
-        producer = parts[4].decode('utf-8')
-        platform = parts[5].decode('utf-8')
+        genre = parts[3].decode('ascii')
+        producer = parts[4].decode('ascii')
+        platform = parts[5].decode('ascii')
 
-        return cls(identifier, title, year, genre, producer, platform)
+        return self(identifier, title, year, genre, producer, platform)
 
-def leia_reg(file):
+def leia_reg(file) -> tuple[int, str] | None:
     try:
-        tam_bytes = file.read(2)
-        if not tam_bytes:
+        bytes_registro = file.read(2) # Lê o tamanho que fica na frente do registro
+        if not bytes_registro:
             return None
-        tam = int.from_bytes(tam_bytes, byteorder='little')
-        if tam > 0:
-            s = file.read(tam)
-            return s
+        tamanho_registro = int.from_bytes(bytes_registro)
+        print(f'Tamanho do cabeçalho: {tamanho_registro}')
+        if tamanho_registro > 0:
+            registro = file.read(tamanho_registro)
+            return (tamanho_registro, registro)
         return None
     except Exception as e:
         print(f'Erro leia_reg: {e}')
         return None
 
-def buscar_jogo_por_id(file, identificador):
-    # Lê os 4 bytes do cabeçalho
+def buscar_jogo_por_id(file, identificador) -> tuple[Game, int] | None:
+    # PUla os 4 bytes do cabeçalho
     file.seek(4)
     while True:
-        registro_data = leia_reg(file)
-        if not registro_data:
+        tamanho_registro_e_dados = leia_reg(file)
+        if not tamanho_registro_e_dados:
             return None
-        try:
-            game = Game.from_bytes(registro_data)
-            if game.identifier == str(identificador):
-                return game
-        except Exception as e:
-            print(f'Erro ao processar registro: {e}')
-            continue
-
+        (tamanho_registro, registro) = tamanho_registro_e_dados
+        game = Game.from_bytes(registro)
+        print(f'Id do objeto Game: {game.identifier}. Identificador: {str(identificador)}')
+        if game.identifier == str(identificador):
+            return (game, tamanho_registro)
+        
 def search_game(file, identifier):
     try:
-        game = buscar_jogo_por_id(file, identifier)
-        if game:
-            print(f"{game.identifier}|{game.title}|{game.year}|{game.genre}|{game.producer}|{game.platform}")
+        game_encontrado = buscar_jogo_por_id(file, identifier)
+        if game_encontrado:
+            (game, tamanho_registro) = game_encontrado
+            print(f"{game.to_string(tamanho_registro)}")
         else:
             print(f"Jogo com identificador {identifier} não encontrado.")
     except ValueError as ve:
@@ -87,40 +80,39 @@ def remove_game(file, identifier):
 def print_led(file):
     pass
 
-def process_operations(file, operations):
-    for operation in operations:
-        op = operation.strip().split(maxsplit=1)
-        if not op or len(op) < 2:
-            print(f"Operação inválida ou vazia: {operation}")
+def process_operations(file, arquivo_de_operacoes):
+    for linha in arquivo_de_operacoes:
+        linha_arquivo_operacoes = linha.strip().split(maxsplit=1)
+        if not linha_arquivo_operacoes or len(linha_arquivo_operacoes) < 2:
+            print(f"Operação inválida ou vazia: {linha}")
             continue
 
-        command = op[0]
-        arguments = op[1]
-
-        if command == 'b':
-            try:
-                identifier = int(arguments)
-                search_game(file, identifier)
-            except ValueError:
-                print(f"Identificador inválido para busca: {arguments}")
-        elif command == 'i':
-            game_data = arguments.split('|')
-            if len(game_data) == 6:
+        comando, argumento = (linha_arquivo_operacoes[0], linha_arquivo_operacoes[1]) # [b, 22] OU [i, <registro>] OU [d, 22], por exemplo
+        match comando:
+            case 'b':
                 try:
-                    game = Game(game_data[0], game_data[1], int(game_data[2]), game_data[3], game_data[4], game_data[5])
-                    insert_game(file, game)
-                except ValueError as ve:
-                    print(f"Erro ao inserir jogo: {ve}")
-            else:
-                print(f"Dados incompletos para inserção de jogo: {arguments}")
-        elif command == 'r':
-            try:
-                identifier = int(arguments)
-                remove_game(file, identifier)
-            except ValueError:
-                print(f"Identificador inválido para remoção: {arguments}")
-        else:
-            print(f"Operação não reconhecida: {operation}")
+                    identifier = int(argumento)
+                    search_game(file, identifier)
+                except ValueError:
+                    print(f"Identificador inválido para busca: {argumento}")
+            case 'i':
+                game_data = argumento.split('|')
+                if len(game_data) == 6:
+                    try:
+                        game = Game(game_data[0], game_data[1], int(game_data[2]), game_data[3], game_data[4], game_data[5])
+                        insert_game(file, game)
+                    except ValueError as ve:
+                        print(f"Erro ao inserir jogo: {ve}")
+                else:
+                    print(f"Dados incompletos para inserção de jogo: {argumento}")
+            case 'r':
+                try:
+                    identifier = int(argumento)
+                    remove_game(file, identifier)
+                except ValueError:
+                    print(f"Identificador inválido para remoção: {argumento}")
+            case _:
+                print(f"Operação não reconhecida: {linha}")
 
 def main():
     if len(sys.argv) < 3:
@@ -128,16 +120,16 @@ def main():
         return
 
     mode = sys.argv[1]
-    operations_file = sys.argv[2]
+    arquivo_operacoes = sys.argv[2]
 
     try:
-        with open('dados.dat', 'r+b') as file:
+        with open('dados.dat', 'r+b') as arquivo_dat:
             if mode == '-e':
-                with open(operations_file, 'r') as ops:
-                    operations = ops.readlines()
-                    process_operations(file, operations)
+                with open(arquivo_operacoes, 'r') as op_file:
+                    operacoes = op_file.readlines()
+                    process_operations(arquivo_dat, operacoes)
             elif mode == '-p':
-                print_led(file)
+                print_led(arquivo_dat)
     except FileNotFoundError:
         print("Erro: arquivo dados.dat não encontrado.")
 
