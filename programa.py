@@ -19,16 +19,18 @@ class Game:
         if len(parts) < 6:
             raise ValueError("Dados incompletos para um jogo")
 
-        identifier = parts[0].decode('ascii')
-        title = parts[1].decode('ascii')
+
+        identifier = parts[0].decode()
+        # identifier = int.from_bytes(parts[0])
+        title = parts[1].decode()
         try:
-            year = int(parts[2].decode('ascii'))
+            year = int(parts[2].decode())
         except ValueError:
             year = 0  # Define um valor padrão para o ano inválido
 
-        genre = parts[3].decode('ascii')
-        producer = parts[4].decode('ascii')
-        platform = parts[5].decode('ascii')
+        genre = parts[3].decode()
+        producer = parts[4].decode()
+        platform = parts[5].decode()
 
         return self(identifier, title, year, genre, producer, platform)
 
@@ -38,7 +40,7 @@ def leia_reg(file) -> tuple[int, str] | None:
         if not bytes_registro:
             return None
         tamanho_registro = int.from_bytes(bytes_registro)
-        print(f'Tamanho do cabeçalho: {tamanho_registro}')
+        # print(f'Tamanho do registro: {tamanho_registro}')
         if tamanho_registro > 0:
             registro = file.read(tamanho_registro)
             return (tamanho_registro, registro)
@@ -56,7 +58,7 @@ def buscar_jogo_por_id(file, identificador) -> tuple[Game, int] | None:
             return None
         (tamanho_registro, registro) = tamanho_registro_e_dados
         game = Game.from_bytes(registro)
-        print(f'Id do objeto Game: {game.identifier}. Identificador: {str(identificador)}')
+        # print(f'Id do objeto Game: {game.identifier}. Identificador: {str(identificador)}')
         if game.identifier == str(identificador):
             return (game, tamanho_registro)
         
