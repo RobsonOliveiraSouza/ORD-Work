@@ -40,7 +40,6 @@ def leia_reg(file) -> tuple[int, str] | None:
         if not bytes_registro:
             return None
         tamanho_registro = int.from_bytes(bytes_registro)
-        # print(f'Tamanho do registro: {tamanho_registro}')
         if tamanho_registro > 0:
             registro = file.read(tamanho_registro)
             return (tamanho_registro, registro)
@@ -58,7 +57,6 @@ def buscar_jogo_por_id(file, identificador) -> tuple[Game, int] | None:
             return None
         (tamanho_registro, registro) = tamanho_registro_e_dados
         game = Game.from_bytes(registro)
-        # print(f'Id do objeto Game: {game.identifier}. Identificador: {str(identificador)}')
         if game.identifier == str(identificador):
             return (game, tamanho_registro)
         
