@@ -78,11 +78,9 @@ def insert_game(file, game):
             if data is None:
                 break
 
-            tamanho_registro, _ = data
-            led.append((tamanho_registro, pos))
-
-        # Ordena a LED para usar o maior espaço disponível (worst-fit)
-        led.sort(reverse=True, key=lambda x: x[0])
+            tamanho_registro, registro = data
+            if registro.startswith(b'*'):
+                led.append((tamanho_registro, pos - tamanho_registro - 2))
 
         inserido = False
         novo_registro_bytes = game.formatado()
@@ -90,7 +88,7 @@ def insert_game(file, game):
 
         for tamanho_registro, pos in led:
             if tamanho_registro >= tamanho_novo_registro:
-                file.seek(pos - tamanho_registro - 2)  # Ajusta posição para incluir os 2 bytes do tamanho
+                file.seek(pos)  # Vai diretamente para a posição do espaço disponível
                 file.write(tamanho_novo_registro.to_bytes(2, byteorder='big'))
                 file.write(novo_registro_bytes.ljust(tamanho_registro, b'\0'))
                 inserido = True
@@ -116,8 +114,8 @@ def insert_game(file, game):
 def remove_game(file, identifier):
     try:
         file.seek(4)  # Pula o cabeçalho
-        pos = file.tell()
         while True:
+            pos = file.tell()
             data = leia_reg(file)
             if data is None:
                 print(f"Jogo com identificador {identifier} não encontrado.")
@@ -128,15 +126,35 @@ def remove_game(file, identifier):
 
             if game.identifier == str(identifier):
                 file.seek(pos - tamanho_registro - 2)  # Ajusta posição para incluir os 2 bytes do tamanho
-                file.write((tamanho_registro).to_bytes(2, byteorder='big'))  # Grava o tamanho do espaço disponível
-                file.write(b'\0' * tamanho_registro)  # Marca o espaço como disponível
+                file.write(b'*')  # Marca o início do registro como removido
 
-                print(f"Remoção do registro de chave \"{identifier}\"\nRegistro removido! ({tamanho_registro} bytes)\nLocal: offset = {pos - tamanho_registro - 2}")
+                # Adiciona o espaço disponível à LED
+                adicionar_led(file, pos - tamanho_registro - 2, tamanho_registro)
+
+                print(f"Remoção do registro de chave \"{identifier}\"\nRegistro marcado como removido ({tamanho_registro} bytes)\nLocal: offset = {pos - tamanho_registro - 2}")
                 return
-
-            pos = file.tell()
     except Exception as e:
         print(f'Erro remove_game: {e}')
+
+def adicionar_led(file, offset, tamanho):
+    try:
+        file.seek(0, os.SEEK_END)  # Vai para o final do arquivo
+        pos_led = file.tell()
+        file.write(offset.to_bytes(4, byteorder='big'))
+        file.write(tamanho.to_bytes(4, byteorder='big'))
+        print(f"Espaço adicionado à LED: Offset = {offset}, Tamanho = {tamanho}, Local = {pos_led}")
+    except Exception as e:
+        print(f'Erro adicionar_led: {e}')
+
+
+def add_to_led(file, size, pos):
+    # Função para adicionar um espaço removido à LED
+    file.seek(0, os.SEEK_END)  # Vai para o final do arquivo
+    led_pos = file.tell()
+    file.write(size.to_bytes(2, byteorder='big'))
+    file.write(pos.to_bytes(4, byteorder='big'))
+    file.seek(0, os.SEEK_END)
+    print(f"Espaço adicionado à LED: Tamanho {size}, Posição {pos}")
 
 def print_led(file):
     try:
